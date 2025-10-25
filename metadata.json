@@ -1,0 +1,5 @@
+{
+  "name": "Daily Focus Todo",
+  "description": "A to-do application where tasks are organized by calendar day. Manage your daily tasks with features like redating, status updates, and reordering, ensuring a clear focus on what needs to be done today.",
+  "requestFramePermissions": []
+}
