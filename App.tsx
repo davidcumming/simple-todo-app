@@ -1,13 +1,19 @@
-
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { TodoList } from './components/TodoList';
+import { Login } from './components/Login';
 import { useTodos } from './hooks/useTodos';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { formatDateISO, addDays } from './utils/dateUtils';
-import { Todo, TodoCreate } from './types';
+import { Todo, TodoCreate, User } from './types';
+import * as todoService from './services/todoService';
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(() => {
+    const storedUser = localStorage.getItem('dailyFocusUser');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   const isoDate = formatDateISO(currentDate);
 
@@ -18,7 +24,28 @@ const App: React.FC = () => {
     addTodo,
     updateTodo,
     deleteTodo,
-  } = useTodos(isoDate);
+  } = useTodos(isoDate, user?.id);
+  
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('dailyFocusUser', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('dailyFocusUser');
+    }
+  }, [user]);
+
+  const handleLoginSuccess = useCallback((loggedInUser: User) => {
+    setUser(loggedInUser);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    // @ts-ignore
+    if (window.google?.accounts?.id) {
+        // @ts-ignore
+        window.google.accounts.id.disableAutoSelect();
+    }
+    setUser(null);
+  }, []);
 
   const handleDateChange = useCallback((newDate: Date) => {
     setCurrentDate(newDate);
@@ -26,7 +53,6 @@ const App: React.FC = () => {
 
   const handleAddTodo = useCallback(async (newTodoData: Omit<TodoCreate, 'date'>) => {
     await addTodo({ ...newTodoData, date: isoDate });
-    // Refocus on the input after adding
     const input = document.getElementById('new-todo-input') as HTMLInputElement;
     if (input) {
       input.focus();
@@ -51,10 +77,16 @@ const App: React.FC = () => {
     'ArrowRight': handleNextDay,
   });
 
+  if (!user) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans flex flex-col items-center p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-4xl mx-auto">
         <Header
+          user={user}
+          onLogout={handleLogout}
           currentDate={currentDate}
           onDateChange={handleDateChange}
           onAddTodo={handleAddTodo}

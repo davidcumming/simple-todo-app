@@ -1,4 +1,3 @@
-
 export enum TodoStatus {
   Open = 'open',
   Completed = 'completed',
@@ -8,7 +7,7 @@ export enum TodoStatus {
 export interface Todo {
   id: string;
   title: string;
-  date: string; // ISO YYYY-MM-DD
+  date: string; // ISO YYY-MM-DD
   status: TodoStatus;
   sortIndex: number;
   assignee?: string;
@@ -20,9 +19,17 @@ export interface Todo {
   isMultiSession?: boolean;
   specialRequirements?: string;
   prerequisites?: string[]; // array of todo IDs
+  urls?: string[]; // array of URLs
   createdAt: string; // ISO datetime
   updatedAt: string; // ISO datetime
 }
 
 export type TodoCreate = Omit<Todo, 'id' | 'status' | 'sortIndex' | 'createdAt' | 'updatedAt'> & { title: string; date: string };
 export type TodoUpdate = Partial<Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>>;
+
+export interface User {
+  id: string; // Google's user ID (sub)
+  email: string;
+  name: string;
+  picture: string; // URL to profile picture
+}

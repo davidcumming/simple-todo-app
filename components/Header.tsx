@@ -1,11 +1,14 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { formatDateDisplay } from '../utils/dateUtils';
-import { TodoCreate } from '../types';
+import { TodoCreate, User } from '../types';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, SparklesIcon } from './Icons';
-import { suggestNextAction } from '../services/aiService';
+// FIX: Import AISuggestion type and use real AI service.
+import { suggestNextAction, AISuggestion } from '../services/aiService';
 
 interface HeaderProps {
+  user: User;
+  onLogout: () => void;
   currentDate: Date;
   onDateChange: (date: Date) => void;
   onAddTodo: (todo: Omit<TodoCreate, 'date'>) => void;
@@ -15,6 +18,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  user,
+  onLogout,
   currentDate,
   onAddTodo,
   onSetToday,
@@ -23,22 +28,29 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  // FIX: Add state to store and display the AI suggestion.
+  const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
-      onAddTodo({ title: title.trim() });
+      // FIX: Pass the suggested next action when creating a new todo.
+      onAddTodo({ title: title.trim(), nextAction: suggestion?.suggestion });
       setTitle('');
+      setSuggestion(null);
     }
   };
   
   const handleSuggest = async () => {
     if(!title.trim()) return;
     setIsSuggesting(true);
+    setSuggestion(null); // Clear previous suggestion
     try {
-      const suggestion = await suggestNextAction(title);
-      // For simplicity, we just log it. A real app might show it in the UI.
-      console.log('AI Suggestion:', suggestion);
+      // FIX: Call the real AI service and store the suggestion in state.
+      const aiSuggestion = await suggestNextAction(title);
+      setSuggestion(aiSuggestion);
     } catch(err) {
       console.error('AI suggestion failed', err);
     } finally {
@@ -46,33 +58,65 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <header className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
           Daily Focus
         </h1>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={onPrevDay}
-            className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
-            aria-label="Previous day"
-          >
-            <ChevronLeftIcon className="w-5 h-5" />
-          </button>
-          <button
-            onClick={onSetToday}
-            className="px-4 py-2 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
-          >
-            Today
-          </button>
-          <button
-            onClick={onNextDay}
-            className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
-            aria-label="Next day"
-          >
-            <ChevronRightIcon className="w-5 h-5" />
-          </button>
+        <div className="flex items-center space-x-4">
+          <div className="hidden sm:flex items-center space-x-2">
+            <button
+              onClick={onPrevDay}
+              className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
+              aria-label="Previous day"
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onSetToday}
+              className="px-4 py-2 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
+            >
+              Today
+            </button>
+            <button
+              onClick={onNextDay}
+              className="p-2 rounded-md bg-gray-700 hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500"
+              aria-label="Next day"
+            >
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="relative" ref={userMenuRef}>
+            <button onClick={() => setShowUserMenu(!showUserMenu)} className="flex items-center space-x-2">
+              <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full" />
+            </button>
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-md shadow-lg z-20">
+                <div className="p-2">
+                  <p className="text-sm font-medium text-white truncate">{user.name}</p>
+                  <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  <div className="border-t border-gray-700 my-2"></div>
+                  <button
+                    onClick={onLogout}
+                    className="w-full text-left px-3 py-1.5 text-sm text-red-400 hover:bg-gray-700 rounded-md"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -110,6 +154,17 @@ export const Header: React.FC<HeaderProps> = ({
             Add
           </button>
         </form>
+        {/* FIX: Display the AI suggestion to the user */}
+        {suggestion && (
+          <div className="mt-3 p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-sm">
+            <p className="font-semibold text-indigo-300 flex items-center">
+              <SparklesIcon className="w-4 h-4 inline-block mr-2" />
+              <span>AI Suggestion</span>
+            </p>
+            <p className="mt-2 text-gray-200"><strong className="font-medium text-gray-300">Next Action:</strong> {suggestion.suggestion}</p>
+            <p className="mt-1 text-gray-400"><em>{suggestion.rationale}</em></p>
+          </div>
+        )}
       </div>
     </header>
   );

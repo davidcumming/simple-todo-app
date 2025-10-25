@@ -1,18 +1,17 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { Todo, TodoCreate, TodoUpdate } from '../types';
 import * as todoService from '../services/todoService';
 
-export const useTodos = (date: string) => {
+export const useTodos = (date: string, userId?: string) => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTodos = useCallback(async (isoDate: string) => {
+  const fetchTodos = useCallback(async (isoDate: string, currentUserId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const fetchedTodos = await todoService.getTodos(isoDate);
+      const fetchedTodos = await todoService.getTodos(isoDate, currentUserId);
       setTodos(fetchedTodos);
     } catch (err) {
       setError('Failed to fetch tasks.');
@@ -23,13 +22,18 @@ export const useTodos = (date: string) => {
   }, []);
 
   useEffect(() => {
-    fetchTodos(date);
-  }, [date, fetchTodos]);
+    if (userId) {
+      fetchTodos(date, userId);
+    } else {
+      setTodos([]);
+      setLoading(false);
+    }
+  }, [date, userId, fetchTodos]);
 
   const addTodo = useCallback(async (newTodoData: TodoCreate) => {
+    if (!userId) return;
     try {
-      const newTodo = await todoService.createTodo(newTodoData);
-      // Only add to the list if its date matches the currently viewed date
+      const newTodo = await todoService.createTodo(newTodoData, userId);
       if (newTodo.date === date) {
         setTodos(prev => [...prev, newTodo].sort((a,b) => a.sortIndex - b.sortIndex));
       }
@@ -37,46 +41,40 @@ export const useTodos = (date: string) => {
       setError('Failed to add task.');
       console.error(err);
     }
-  }, [date]);
+  }, [date, userId]);
 
   const updateTodo = useCallback(async (id: string, data: TodoUpdate) => {
-    const originalTodos = todos;
+    if (!userId) return;
+    const originalTodos = [...todos];
     
-    // Optimistic update
     setTodos(prev => {
-      // If redating, remove it from the current view
       if (data.date && data.date !== date) {
         return prev.filter(t => t.id !== id);
       }
-      // Otherwise, update in place
       return prev.map(t => t.id === id ? { ...t, ...data, updatedAt: new Date().toISOString() } : t)
     });
 
     try {
-      await todoService.updateTodo(id, data);
-      // If the update was a redate to a different day, we don't need to do anything else,
-      // as the optimistic update already removed it.
-      // If it was another update, the UI is already correct.
+      await todoService.updateTodo(id, data, userId);
     } catch (err) {
       setError('Failed to update task. Reverting changes.');
       console.error(err);
-      // Revert on error
       setTodos(originalTodos);
     }
-  }, [todos, date]);
-
+  }, [todos, date, userId]);
 
   const deleteTodo = useCallback(async (id: string) => {
-    const originalTodos = todos;
+    if (!userId) return;
+    const originalTodos = [...todos];
     setTodos(prev => prev.filter(t => t.id !== id));
     try {
-      await todoService.deleteTodo(id);
+      await todoService.deleteTodo(id, userId);
     } catch (err) {
       setError('Failed to delete task.');
       console.error(err);
       setTodos(originalTodos);
     }
-  }, [todos]);
+  }, [todos, userId]);
 
   return { todos, loading, error, addTodo, updateTodo, deleteTodo };
 };

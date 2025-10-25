@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Todo, TodoStatus, TodoUpdate } from '../types';
 import { formatDateISO } from '../utils/dateUtils';
-import { CalendarIcon, ChevronDownIcon, GripVerticalIcon, TrashIcon, XCircleIcon } from './Icons';
+import { CalendarIcon, ChevronDownIcon, GripVerticalIcon, TrashIcon, XCircleIcon, XMarkIcon } from './Icons';
 
 interface TodoItemProps {
   todo: Todo;
@@ -130,7 +130,21 @@ const TodoDetailsPanel: React.FC<TodoDetailsPanelProps> = ({ todo, onUpdate }) =
     nextAction: todo.nextAction || '',
     plan: todo.plan || '',
     project: todo.project || '',
+    urls: todo.urls || [] as string[],
   });
+  const [newUrl, setNewUrl] = useState('');
+
+  useEffect(() => {
+    setFormData({
+      assignee: todo.assignee || '',
+      difficulty: todo.difficulty || 0,
+      nextAction: todo.nextAction || '',
+      plan: todo.plan || '',
+      project: todo.project || '',
+      urls: todo.urls || [],
+    });
+  }, [todo]);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -139,7 +153,7 @@ const TodoDetailsPanel: React.FC<TodoDetailsPanelProps> = ({ todo, onUpdate }) =
   
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    const key = name as keyof typeof formData;
+    const key = name as keyof Omit<typeof formData, 'urls'>;
     let updateValue: string | number | undefined = value;
 
     if (key === 'difficulty') {
@@ -152,6 +166,23 @@ const TodoDetailsPanel: React.FC<TodoDetailsPanelProps> = ({ todo, onUpdate }) =
     onUpdate(todo.id, { [name]: updateValue });
   };
   
+  const handleAddUrl = () => {
+    const trimmedUrl = newUrl.trim();
+    if (trimmedUrl === '') return;
+    try {
+      new URL(trimmedUrl); // Basic validation: will throw if URL is malformed
+      const updatedUrls = [...formData.urls, trimmedUrl];
+      onUpdate(todo.id, { urls: updatedUrls });
+      setNewUrl('');
+    } catch (error) {
+      alert('Please enter a valid URL (e.g., "https://example.com").');
+    }
+  };
+
+  const handleDeleteUrl = (indexToDelete: number) => {
+    const updatedUrls = formData.urls.filter((_, index) => index !== indexToDelete);
+    onUpdate(todo.id, { urls: updatedUrls });
+  };
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -181,6 +212,46 @@ const TodoDetailsPanel: React.FC<TodoDetailsPanelProps> = ({ todo, onUpdate }) =
       <div className="md:col-span-2 space-y-1">
         <label htmlFor={`plan-${todo.id}`} className="block font-medium text-gray-400">Plan</label>
         <textarea id={`plan-${todo.id}`} name="plan" value={formData.plan} onChange={handleInputChange} onBlur={handleBlur} rows={3} className="w-full bg-gray-600 border border-gray-500 rounded px-2 py-1 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+      </div>
+      <div className="md:col-span-2 space-y-2">
+        <label className="block font-medium text-gray-400">Attached URLs</label>
+        {formData.urls.length > 0 ? (
+          <ul className="space-y-1.5">
+            {formData.urls.map((url, index) => (
+              <li key={index} className="flex items-center justify-between bg-gray-600/50 p-1.5 pl-3 rounded-md group">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline truncate text-sm flex-grow">
+                  {url}
+                </a>
+                <button 
+                  onClick={() => handleDeleteUrl(index)} 
+                  className="p-1 rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-900/50 transition-opacity"
+                  aria-label={`Delete URL ${url}`}
+                >
+                  <XMarkIcon className="w-4 h-4 text-red-400" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-500 text-xs italic px-1">No URLs attached.</p>
+        )}
+        <div className="flex items-center space-x-2">
+          <input
+            type="url"
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUrl())}
+            placeholder="Add a new URL..."
+            className="flex-grow bg-gray-600 border border-gray-500 rounded-md px-2 py-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+          />
+          <button 
+            onClick={handleAddUrl} 
+            className="px-4 py-1 bg-indigo-600 rounded-md text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+            disabled={!newUrl.trim()}
+          >
+            Add
+          </button>
+        </div>
       </div>
     </div>
   );
